@@ -81,7 +81,8 @@ function randomBetween(min, max) {
   return min + Math.random() * (max - min);
 }
 
-// 다리떨기 빌런: 책상을 규칙적으로 두드리는 듯한 저음 진동을 연속으로 재생
+// 다리떨기 빌런: 책상을 규칙적으로 두드리는 듯한 진동 + 타격감 있는 클릭을 함께 재생
+// (저음만으로는 노트북/폰 스피커에서 거의 안 들리므로 노이즈 클릭을 섞어 타격감을 보강)
 function playLegTapBurst() {
   const ctx = getAudioCtx();
   const tapCount = 5 + Math.floor(Math.random() * 6);
@@ -90,13 +91,27 @@ function playLegTapBurst() {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "triangle";
-    osc.frequency.value = randomBetween(85, 130);
+    osc.frequency.value = randomBetween(90, 140);
     gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.22, t + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    gain.gain.exponentialRampToValueAtTime(0.55, t + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
     osc.connect(gain).connect(ctx.destination);
     osc.start(t);
-    osc.stop(t + 0.1);
+    osc.stop(t + 0.13);
+
+    const click = ctx.createBufferSource();
+    click.buffer = getNoiseBuffer(ctx);
+    const clickOffset = Math.random() * (noiseBuffer.duration - 0.05);
+    const clickFilter = ctx.createBiquadFilter();
+    clickFilter.type = "highpass";
+    clickFilter.frequency.value = 800;
+    const clickGain = ctx.createGain();
+    clickGain.gain.setValueAtTime(0.0001, t);
+    clickGain.gain.exponentialRampToValueAtTime(0.25, t + 0.004);
+    clickGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+    click.connect(clickFilter).connect(clickGain).connect(ctx.destination);
+    click.start(t, clickOffset, 0.03);
+
     t += randomBetween(0.14, 0.2);
   }
 }
@@ -115,11 +130,11 @@ function playPaperRustleBurst() {
     const bandpass = ctx.createBiquadFilter();
     bandpass.type = "bandpass";
     bandpass.frequency.value = randomBetween(2500, 5000);
-    bandpass.Q.value = 0.7;
+    bandpass.Q.value = 0.6;
 
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.18, t + duration * 0.3);
+    gain.gain.exponentialRampToValueAtTime(0.5, t + duration * 0.3);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
 
     source.connect(bandpass).connect(gain).connect(ctx.destination);
@@ -169,6 +184,9 @@ function syncVillainSounds() {
 
 legVillainToggle.addEventListener("change", syncVillainSounds);
 paperVillainToggle.addEventListener("change", syncVillainSounds);
+
+document.getElementById("legVillainPreview").addEventListener("click", playLegTapBurst);
+document.getElementById("paperVillainPreview").addEventListener("click", playPaperRustleBurst);
 
 function formatTime(totalSec) {
   const s = Math.max(0, Math.round(totalSec));

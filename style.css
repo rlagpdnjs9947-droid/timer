@@ -236,6 +236,31 @@ h1 {
   margin-top: 0;
 }
 
+.villain-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  max-width: 280px;
+  padding: 6px 0;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.villain-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.btn-preview {
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  background: var(--ring-track);
+}
+
 .banner {
   position: fixed;
   top: 0;
