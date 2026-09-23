@@ -18,6 +18,8 @@ const pauseBtn = document.getElementById("pauseBtn");
 const resetBtn = document.getElementById("resetBtn");
 const soundToggle = document.getElementById("soundToggle");
 const autoNextToggle = document.getElementById("autoNextToggle");
+const legVillainToggle = document.getElementById("legVillainToggle");
+const paperVillainToggle = document.getElementById("paperVillainToggle");
 const bannerEl = document.getElementById("banner");
 
 ringFgEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
@@ -32,25 +34,141 @@ let finishedForThisRun = false;
 let doneSubjectIds = new Set();
 
 let audioCtx = null;
-function playBeep(times = 1, freq = 880) {
-  if (!soundToggle.checked) return;
+function getAudioCtx() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+function playBeep(times = 1, freq = 880) {
+  if (!soundToggle.checked) return;
+  const ctx = getAudioCtx();
   for (let i = 0; i < times; i++) {
-    const t0 = audioCtx.currentTime + i * 0.35;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
+    const t0 = ctx.currentTime + i * 0.35;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
     osc.type = "sine";
     osc.frequency.value = freq;
     gain.gain.setValueAtTime(0.0001, t0);
     gain.gain.exponentialRampToValueAtTime(0.3, t0 + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28);
-    osc.connect(gain).connect(audioCtx.destination);
+    osc.connect(gain).connect(ctx.destination);
     osc.start(t0);
     osc.stop(t0 + 0.3);
   }
 }
+
+// ---- 수능빌런 소리 (실전 연습용 배경 소음) ----
+
+let noiseBuffer = null;
+function getNoiseBuffer(ctx) {
+  if (!noiseBuffer) {
+    const length = ctx.sampleRate * 2;
+    noiseBuffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+  }
+  return noiseBuffer;
+}
+
+function randomBetween(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+// 다리떨기 빌런: 책상을 규칙적으로 두드리는 듯한 저음 진동을 연속으로 재생
+function playLegTapBurst() {
+  const ctx = getAudioCtx();
+  const tapCount = 5 + Math.floor(Math.random() * 6);
+  let t = ctx.currentTime + 0.02;
+  for (let i = 0; i < tapCount; i++) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = randomBetween(85, 130);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.22, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.1);
+    t += randomBetween(0.14, 0.2);
+  }
+}
+
+// 종이넘기기 빌런: 필터링된 노이즈로 사각거리는 종이 소리를 재현
+function playPaperRustleBurst() {
+  const ctx = getAudioCtx();
+  const rustleCount = 1 + Math.floor(Math.random() * 2);
+  let t = ctx.currentTime + 0.02;
+  for (let i = 0; i < rustleCount; i++) {
+    const duration = randomBetween(0.25, 0.5);
+    const source = ctx.createBufferSource();
+    source.buffer = getNoiseBuffer(ctx);
+    const offset = Math.random() * (noiseBuffer.duration - duration - 0.1);
+
+    const bandpass = ctx.createBiquadFilter();
+    bandpass.type = "bandpass";
+    bandpass.frequency.value = randomBetween(2500, 5000);
+    bandpass.Q.value = 0.7;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.18, t + duration * 0.3);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+    source.connect(bandpass).connect(gain).connect(ctx.destination);
+    source.start(t, offset, duration);
+    t += duration + randomBetween(0.05, 0.15);
+  }
+}
+
+let legVillainTimeoutId = null;
+let paperVillainTimeoutId = null;
+
+function scheduleLegVillain() {
+  playLegTapBurst();
+  legVillainTimeoutId = setTimeout(scheduleLegVillain, randomBetween(5000, 14000));
+}
+
+function schedulePaperVillain() {
+  playPaperRustleBurst();
+  paperVillainTimeoutId = setTimeout(schedulePaperVillain, randomBetween(7000, 18000));
+}
+
+function stopLegVillain() {
+  clearTimeout(legVillainTimeoutId);
+  legVillainTimeoutId = null;
+}
+
+function stopPaperVillain() {
+  clearTimeout(paperVillainTimeoutId);
+  paperVillainTimeoutId = null;
+}
+
+function syncVillainSounds() {
+  const running = intervalId !== null;
+
+  if (running && legVillainToggle.checked) {
+    if (!legVillainTimeoutId) scheduleLegVillain();
+  } else {
+    stopLegVillain();
+  }
+
+  if (running && paperVillainToggle.checked) {
+    if (!paperVillainTimeoutId) schedulePaperVillain();
+  } else {
+    stopPaperVillain();
+  }
+}
+
+legVillainToggle.addEventListener("change", syncVillainSounds);
+paperVillainToggle.addEventListener("change", syncVillainSounds);
 
 function formatTime(totalSec) {
   const s = Math.max(0, Math.round(totalSec));
@@ -171,6 +289,7 @@ function tick() {
 function startInterval() {
   endTimestamp = Date.now() + remainingSeconds * 1000;
   intervalId = setInterval(tick, 250);
+  syncVillainSounds();
 }
 
 function stopInterval() {
@@ -178,6 +297,7 @@ function stopInterval() {
     clearInterval(intervalId);
     intervalId = null;
   }
+  syncVillainSounds();
 }
 
 startBtn.addEventListener("click", () => {

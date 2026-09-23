@@ -216,6 +216,26 @@ h1 {
   cursor: pointer;
 }
 
+.villain-panel {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ring-track);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.villain-title {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.villain-panel .options {
+  margin-top: 0;
+}
+
 .banner {
   position: fixed;
   top: 0;
